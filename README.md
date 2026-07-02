@@ -14,20 +14,38 @@ It runs two containers and owns one network:
 
 ## How it works
 
-```
-                       ┌──────────── ducktivity_edge network ───────────┐
-  Cloudflare edge ────▶│  cloudflared ─▶ drinkwater-service:8080            │
-  (one tunnel)         │               └▶ identity-service:9000             │
-                       │                  └▶ <next>-service:<port>          │
-                       └─────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    cf["Cloudflare edge<br/>(one tunnel)"]
+    bs["BetterStack"]
 
-  vector ─── tails every container labeled collect_logs=true ───▶ BetterStack
+    subgraph edge["ducktivity_edge network"]
+        cloudflared["cloudflared<br/><i>ingress</i>"]
+        vector["vector<br/><i>egress</i>"]
+        id["identity-backend:8000"]
+        dw["drinkwater-backend:8001"]
+        next["&lt;next&gt;-backend:&lt;port&gt;"]
+    end
+
+    host["host sshd<br/>host.docker.internal:22"]
+
+    cf -- "public request" --> cloudflared
+    cf -- "admin SSH<br/>(CF Access)" --> cloudflared
+    cloudflared --> id
+    cloudflared --> dw
+    cloudflared --> next
+    cloudflared -- "→ sshd" --> host
+
+    id -. "collect_logs=true" .-> vector
+    dw -. "collect_logs=true" .-> vector
+    next -. "collect_logs=true" .-> vector
+    vector --> bs
 ```
 
 **Ingress (traffic in).** `cloudflared` dials _out_ to Cloudflare and holds the tunnel
 open — the box opens no inbound ports. A public request for e.g. `id.ducktvt.com` hits
 Cloudflare's edge, travels down the tunnel, and `cloudflared` forwards it over the
-`ducktivity_edge` network to that app's container (`identity-service:9000`). The
+`ducktivity_edge` network to that app's container (`identity-backend:8000`). The
 hostname → container mapping is configured in the Cloudflare dashboard (the tunnel's
 **Public Hostnames**), not here.
 
@@ -44,10 +62,10 @@ duplicated.
 An app never runs its own `cloudflared` or `vector`. It just:
 
 1. Attaches its `app` service to the external `ducktivity_edge` network with a **unique
-   alias** (`identity-service`, `drinkwater-service`, …).
+   alias** (`identity-backend`, `drinkwater-backend`, …).
 2. Carries the `collect_logs: "true"` label so `vector` ships its logs.
 3. Gets a **Public Hostname** rule added in the Cloudflare tunnel:
-   `<app-api>.ducktvt.com → http://<app>-service:<port>`.
+   `<app-api>.ducktvt.com → http://<app>-backend:<port>`.
 
 No new tunnel, no new connector token, no new log shipper — ever.
 
