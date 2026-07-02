@@ -1,8 +1,4 @@
-# Suite-wide Vector pipeline: tail every app container's stdout on the box (JSON from
-# each app's slog), enrich, and ship to BetterStack. One shipper for the whole box —
-# docker_logs selects containers by the `collect_logs` label, across all Compose
-# projects, so this replaces the old per-app vectors (which double-shipped). Disk-
-# buffered, so a BetterStack blip never blocks an app or drops logs.
+# Suite-wide Vector pipeline: tail every app container's stdout on the box (JSON from each app's slog), enrich, and ship to BetterStack. One shipper for the whole box — docker_logs selects containers by the `collect_logs` label, across all Compose projects. Disk-buffered, so a BetterStack blip never blocks an app or drops logs.
 
 data_dir: /var/lib/vector
 

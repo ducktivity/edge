@@ -1,24 +1,14 @@
 # Ducktivity edge stack — the deployment's boundary layer.
 #
-# The shared, box-wide services every app plugs into but that belong to no single
-# app. Runs the ONE cloudflared connector (public ingress + Access SSH broker) and
-# the ONE vector log shipper (egress to BetterStack) for the whole suite, and owns
-# the `ducktivity_edge` network that every app stack attaches to. App stacks run no
-# cloudflared and no vector of their own — they just carry the `collect_logs` label
-# and attach to the network.
+# The shared, box-wide services every app plugs into but that belong to no single app. Runs the ONE cloudflared connector (public ingress + Access SSH broker) and the ONE vector log shipper (egress to BetterStack) for the whole suite, and owns the `ducktivity_edge` network that every app stack attaches to. App stacks run no cloudflared and no vector of their own — they just carry the `collect_logs` label and attach to the network.
 services:
   cloudflared:
     image: cloudflare/cloudflared:latest # pin to a digest in prod
     command: tunnel --no-autoupdate run
     environment:
-      # Connector token that attaches this cloudflared to the suite tunnel — this is
-      # NOT the Access service token. Get it from Cloudflare Zero Trust -> Networks
-      # -> Tunnels -> <tunnel> -> Configure (the long string after `install`/`--token`).
+      # Connector token that attaches this cloudflared to the suite tunnel — this is NOT the Access service token. Get it from Cloudflare Zero Trust -> Networks -> Tunnels -> <tunnel> -> Configure (the long string after `install`/`--token`).
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_CONNECTOR_TOKEN}
-    # Lets Cloudflare Access broker SSH to the box's host sshd over this same tunnel
-    # (the Access SSH hostname maps to ssh://host.docker.internal:22). This moved here
-    # from drinkwater's compose, so the CI deploy SSH path keeps working once the app
-    # stacks drop their own cloudflared.
+    # Lets Cloudflare Access broker SSH to the box's host sshd over this same tunnel (the Access SSH hostname maps to ssh://host.docker.internal:22), which is how the CI deploy SSH path reaches the box.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # Ship the connector's own logs through the edge vector too.
@@ -38,9 +28,7 @@ services:
       BETTERSTACK_INGEST_HOST: ${BETTERSTACK_INGEST_HOST:-https://in.logs.betterstack.com}
     volumes:
       - ./vector/vector.yaml:/etc/vector/vector.yaml:ro
-      # Read-only Docker socket so docker_logs can tail EVERY app container on the box
-      # (it filters by the collect_logs label, not by compose project). This is why one
-      # vector here replaces the per-app vectors — no more double-shipping.
+      # Read-only Docker socket so docker_logs can tail EVERY app container on the box (it filters by the collect_logs label, not by compose project), letting one vector here ship for the whole box.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Persist the disk buffer so a BetterStack outage doesn't drop logs.
       - vector_data:/var/lib/vector
@@ -50,7 +38,6 @@ volumes:
   vector_data:
 
 networks:
-  # Fixed name (no compose-project prefix) so every app stack can attach to it as an
-  # `external` network of the same name.
+  # Fixed name (no compose-project prefix) so every app stack can attach to it as an `external` network of the same name.
   ducktivity_edge:
     name: ducktivity_edge
