@@ -79,7 +79,19 @@ No new tunnel, no new connector token, no new log shipper — ever.
 
 ## Running it
 
-The stack lives at `/opt/ducktivity/edge` on the box.
+Deploy from your machine with one command — it copies `docker-compose.yml`, the
+`vector/` config, and your local `.env.prod` (landed as `.env`) to the box over
+Cloudflare Access SSH, then pulls and brings the stack up:
+
+```bash
+./deploy/remote-deploy.sh
+```
+
+(Prereqs: `cloudflared` installed + the Access service token sourced, and a filled
+`edge/.env.prod` — copy from `.env.example`. Same setup as the app deploys.)
+
+The stack lives at `/opt/ducktivity/edge` on the box, so you can also drive it directly
+there:
 
 ```bash
 cd /opt/ducktivity/edge
